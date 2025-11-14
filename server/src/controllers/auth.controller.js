@@ -67,3 +67,46 @@ exports.getUser = (req, res) => {
         res.status(401).json({ error: "Not authenticated" });
     }
 };
+
+exports.exchangeCode = async (req, res) => {
+    const { code, callback_url } = req.body;
+
+    if (!code) {
+        return res.status(400).json({ error: "Authorization code not provided" });
+    }
+
+    try {
+        // Get access token using utility function
+        const accessToken = await getGitHubAccessToken(code);
+        
+        if (!accessToken) {
+            return res.status(400).json({ error: "Failed to get access token" });
+        }
+
+        // Fetch GitHub user profile using utility function
+        const user = await getGitHubUser(accessToken);
+
+        res.json({
+            access_token: accessToken,
+            user: {
+                id: user.id,
+                login: user.login,
+                name: user.name,
+                email: user.email,
+                avatar_url: user.avatar_url
+            }
+        });
+    } catch (err) {
+        console.error("GitHub OAuth Error:", err.message);
+        res.status(400).json({ error: "OAuth exchange failed" });
+    }
+};
+
+exports.verifyToken = async (req, res) => {
+    try {
+        // Token verification is handled by middleware
+        res.json({ valid: true, user: req.user });
+    } catch (error) {
+        res.status(401).json({ error: "Invalid token" });
+    }
+};

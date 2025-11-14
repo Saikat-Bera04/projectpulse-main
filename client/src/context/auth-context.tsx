@@ -9,6 +9,7 @@ interface User {
   name: string;
   email: string;
   avatar_url: string;
+  access_token?: string;
 }
 
 interface AuthContextType {
@@ -53,8 +54,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkAuth();
   }, []);
 
-  const login = (user: User) => {
-    setUser(user);
+  const login = (userData: User) => {
+    // Store the token in localStorage for API calls
+    if (userData.access_token) {
+      localStorage.setItem('token', userData.access_token);
+      // Remove the token from user object to keep it secure
+      const { access_token, ...userWithoutToken } = userData;
+      setUser(userWithoutToken);
+    } else {
+      setUser(userData);
+    }
   };
 
   const logout = async () => {
@@ -69,6 +78,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Logout failed:', error);
     }
+    // Clear the stored token
+    localStorage.removeItem('token');
     setUser(null);
   };
 
