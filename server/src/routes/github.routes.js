@@ -1,7 +1,10 @@
-const express = require("express");
+import express from "express";
+import axios from "axios";
+import { getGitHubRepositories, getGitHubIssues, createGitHubIssue, updateGitHubIssue } from "../utils/github.js";
+import { authenticateToken } from "../middleware/auth.js";
+import prisma from '../config/prisma.js';
+
 const router = express.Router();
-const { getGitHubRepositories, getGitHubIssues, createGitHubIssue, updateGitHubIssue } = require("../utils/github");
-const { authenticateToken } = require("../middleware/auth");
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -10,6 +13,47 @@ router.use(authenticateToken);
 router.get("/repositories", async (req, res) => {
     try {
         const repositories = await getGitHubRepositories(req.token);
+        
+        // Cache repositories in database
+        if (repositories && repositories.length > 0) {
+            await Promise.all(
+                repositories.map(repo => 
+                    prisma.repository.upsert({
+                        where: { githubId: repo.id },
+                        update: {
+                            name: repo.name,
+                            fullName: repo.full_name,
+                            description: repo.description,
+                            url: repo.html_url,
+                            language: repo.language,
+                            private: repo.private,
+                            fork: repo.fork,
+                            stars: repo.stargazers_count,
+                            forks: repo.forks_count,
+                            openIssues: repo.open_issues_count,
+                            updatedAt: new Date(repo.updated_at),
+                            lastFetchedAt: new Date(),
+                        },
+                        create: {
+                            githubId: repo.id,
+                            name: repo.name,
+                            fullName: repo.full_name,
+                            description: repo.description,
+                            url: repo.html_url,
+                            language: repo.language,
+                            private: repo.private,
+                            fork: repo.fork,
+                            stars: repo.stargazers_count,
+                            forks: repo.forks_count,
+                            openIssues: repo.open_issues_count,
+                            updatedAt: new Date(repo.updated_at),
+                            userId: req.user.id,
+                        },
+                    })
+                )
+            ).catch(err => console.error('Error caching repositories:', err));
+        }
+        
         res.json(repositories);
     } catch (error) {
         console.error("Error fetching repositories:", error.message);
@@ -72,4 +116,56 @@ router.put("/issues/:number", async (req, res) => {
     }
 });
 
-module.exports = router;
+// Sync repository with project
+router.post("/sync/:owner/:repo", async (req, res) => {
+    try {
+        const { owner, repo } = req.params;
+        const userId = req.user.id;
+
+        // Fetch repository details from GitHub
+        const repoResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}`, {
+            headers: {
+                Authorization: `Bearer ${req.token}`,
+                "User-Agent": "ProjectPulse-App",
+                Accept: "application/vnd.github.v3+json"
+            }
+        });
+
+        const repoData = repoResponse.data;
+
+        // Create or update project
+        const project = await prisma.project.upsert({
+            where: { githubRepoId: String(repoData.id) },
+            update: {
+                name: repoData.name,
+                description: repoData.description,
+                githubRepoUrl: repoData.html_url,
+                githubRepoName: repoData.full_name,
+                repoOwner: owner,
+                repoPrivate: repoData.private,
+                lastSyncedAt: new Date(),
+            },
+            create: {
+                name: repoData.name,
+                description: repoData.description,
+                githubRepoId: String(repoData.id),
+                githubRepoUrl: repoData.html_url,
+                githubRepoName: repoData.full_name,
+                repoOwner: owner,
+                repoPrivate: repoData.private,
+                ownerId: userId,
+                lastSyncedAt: new Date(),
+            },
+        });
+
+        res.json({ 
+            message: "Successfully synced repository with project",
+            project 
+        });
+    } catch (error) {
+        console.error("Error syncing repository:", error.message);
+        res.status(500).json({ error: "Failed to sync repository" });
+    }
+});
+
+export default router;

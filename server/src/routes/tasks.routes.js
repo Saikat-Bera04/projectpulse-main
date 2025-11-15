@@ -1,7 +1,8 @@
-const express = require("express");
+import express from "express";
+import * as tasksController from "../controllers/tasks.controller.js";
+import { authenticateToken } from "../middleware/auth.js";
+
 const router = express.Router();
-const tasksController = require("../controllers/tasks.controller");
-const { authenticateToken } = require("../middleware/auth");
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -21,4 +22,4 @@ router.post("/from-github", tasksController.createTaskFromGitHubIssue);
 router.post("/:id/link-github", tasksController.linkTaskToGitHubIssue);
 router.post("/:id/github", tasksController.linkToGitHubIssue);
 
-module.exports = router;
+export default router;

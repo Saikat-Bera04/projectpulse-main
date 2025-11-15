@@ -1,6 +1,6 @@
-const axios = require("axios");
+import axios from "axios";
 
-exports.getGitHubAccessToken = async (code) => {
+export const getGitHubAccessToken = async (code) => {
     try {
         const response = await axios.post(
             "https://github.com/login/oauth/access_token",
@@ -23,7 +23,7 @@ exports.getGitHubAccessToken = async (code) => {
     }
 };
 
-exports.getGitHubUser = async (accessToken) => {
+export const getGitHubUser = async (accessToken) => {
     try {
         const response = await axios.get("https://api.github.com/user", {
             headers: {
@@ -39,7 +39,7 @@ exports.getGitHubUser = async (accessToken) => {
     }
 };
 
-exports.getGitHubRepositories = async (accessToken) => {
+export const getGitHubRepositories = async (accessToken) => {
     try {
         const response = await axios.get("https://api.github.com/user/repos", {
             headers: {
@@ -87,7 +87,7 @@ exports.getGitHubRepositories = async (accessToken) => {
     }
 };
 
-exports.getGitHubIssues = async (accessToken) => {
+export const getGitHubIssues = async (accessToken) => {
     try {
         const response = await axios.get("https://api.github.com/issues", {
             headers: {
@@ -112,7 +112,7 @@ exports.getGitHubIssues = async (accessToken) => {
     }
 };
 
-exports.createGitHubIssue = async (accessToken, repository, title, body, labels = []) => {
+export const createGitHubIssue = async (accessToken, repository, title, body, labels = []) => {
     try {
         const response = await axios.post(`https://api.github.com/repos/${repository}/issues`, {
             title,
@@ -132,7 +132,7 @@ exports.createGitHubIssue = async (accessToken, repository, title, body, labels 
     }
 };
 
-exports.updateGitHubIssue = async (accessToken, repository, issueNumber, updates) => {
+export const updateGitHubIssue = async (accessToken, repository, issueNumber, updates) => {
     try {
         const response = await axios.patch(`https://api.github.com/repos/${repository}/issues/${issueNumber}`, updates, {
             headers: {

@@ -1,7 +1,8 @@
-const express = require("express");
+import express from "express";
+import * as authController from "../controllers/auth.controller.js";
+import { authenticateToken } from "../middleware/auth.js";
+
 const router = express.Router();
-const authController = require("../controllers/auth.controller");
-const { authenticateToken } = require("../middleware/auth");
 
 router.get("/github", authController.githubLogin);
 router.get("/github/callback", authController.githubCallback);
@@ -10,4 +11,4 @@ router.get("/verify", authenticateToken, authController.verifyToken);
 router.post("/logout", authController.logout);
 router.get("/user", authController.getUser);
 
-module.exports = router;
+export default router;

@@ -1,13 +1,28 @@
-const { getGitHubUser } = require("../utils/github");
+import { getGitHubUser } from "../utils/github.js";
+import prisma from '../config/prisma.js';
 
 // Session-based authentication middleware
-exports.authenticateToken = async (req, res, next) => {
+export const authenticateToken = async (req, res, next) => {
     try {
-        // Check for token in session first
-        if (req.session && req.session.user) {
-            req.user = req.session.user;
-            req.token = req.session.token;
-            return next();
+        // Check for user session with database lookup
+        if (req.session && req.session.userId) {
+            const user = await prisma.user.findUnique({
+                where: { id: req.session.userId },
+                select: {
+                    id: true,
+                    email: true,
+                    name: true,
+                    githubUsername: true,
+                    githubAccessToken: true,
+                    avatarUrl: true,
+                },
+            });
+
+            if (user) {
+                req.user = user;
+                req.token = user.githubAccessToken;
+                return next();
+            }
         }
 
         // Fallback to token-based auth
@@ -43,8 +58,31 @@ exports.authenticateToken = async (req, res, next) => {
             req.session.token = token;
         }
 
+        // Find or create user in database
+        let dbUser = await prisma.user.upsert({
+            where: { githubId: String(user.id) },
+            update: {
+                githubAccessToken: token,
+                lastLogin: new Date(),
+            },
+            create: {
+                githubId: String(user.id),
+                githubUsername: user.login,
+                email: user.email || `${user.login}@github.local`,
+                name: user.name || user.login,
+                githubAccessToken: token,
+                avatarUrl: user.avatar_url,
+                lastLogin: new Date(),
+            },
+        });
+
+        // Store in session
+        if (req.session) {
+            req.session.userId = dbUser.id;
+        }
+
         // Attach to request
-        req.user = user;
+        req.user = dbUser;
         req.token = token;
         next();
     } catch (error) {
@@ -60,7 +98,7 @@ exports.authenticateToken = async (req, res, next) => {
 };
 
 // Optional: Middleware to refresh token if needed
-exports.refreshTokenIfNeeded = async (req, res, next) => {
+export const refreshTokenIfNeeded = async (req, res, next) => {
     try {
         // Skip if we already have a valid session
         if (req.session && req.session.user) {
@@ -81,3 +119,6 @@ exports.refreshTokenIfNeeded = async (req, res, next) => {
         next();
     }
 };
+
+// Export requireAuth as an alias for authenticateToken
+export const requireAuth = authenticateToken;

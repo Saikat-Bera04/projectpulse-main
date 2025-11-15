@@ -1,10 +1,10 @@
-const { getGitHubUser, getGitHubRepositories, getGitHubIssues, createGitHubIssue } = require("../utils/github");
+import { getGitHubUser, getGitHubRepositories, getGitHubIssues, createGitHubIssue } from "../utils/github.js";
 
 // In-memory storage for demo (replace with database in production)
 let tasks = [];
 let taskIdCounter = 1;
 
-exports.getUserTasks = async (req, res) => {
+export const getUserTasks = async (req, res) => {
     try {
         const userTasks = tasks.filter(task => task.assignee === req.user.login);
         res.json(userTasks);
@@ -13,7 +13,7 @@ exports.getUserTasks = async (req, res) => {
     }
 };
 
-exports.getProjectTasks = async (req, res) => {
+export const getProjectTasks = async (req, res) => {
     try {
         // Return all tasks for now (in production, filter by user's projects)
         res.json(tasks);
@@ -22,7 +22,7 @@ exports.getProjectTasks = async (req, res) => {
     }
 };
 
-exports.createTask = async (req, res) => {
+export const createTask = async (req, res) => {
     try {
         const { title, description, priority, status, project, assignee } = req.body;
         
@@ -46,7 +46,7 @@ exports.createTask = async (req, res) => {
     }
 };
 
-exports.getTask = async (req, res) => {
+export const getTask = async (req, res) => {
     try {
         const task = tasks.find(t => t.id === parseInt(req.params.id));
         if (!task) {
@@ -58,7 +58,7 @@ exports.getTask = async (req, res) => {
     }
 };
 
-exports.updateTask = async (req, res) => {
+export const updateTask = async (req, res) => {
     try {
         const taskIndex = tasks.findIndex(t => t.id === parseInt(req.params.id));
         if (taskIndex === -1) {
@@ -78,7 +78,7 @@ exports.updateTask = async (req, res) => {
     }
 };
 
-exports.deleteTask = async (req, res) => {
+export const deleteTask = async (req, res) => {
     try {
         const taskIndex = tasks.findIndex(t => t.id === parseInt(req.params.id));
         if (taskIndex === -1) {
@@ -92,7 +92,7 @@ exports.deleteTask = async (req, res) => {
     }
 };
 
-exports.createTaskFromGitHubIssue = async (req, res) => {
+export const createTaskFromGitHubIssue = async (req, res) => {
     try {
         const { issueId } = req.body;
         const token = req.cookies.github_token;
@@ -127,7 +127,7 @@ exports.createTaskFromGitHubIssue = async (req, res) => {
     }
 };
 
-exports.linkTaskToGitHubIssue = async (req, res) => {
+export const linkTaskToGitHubIssue = async (req, res) => {
     try {
         const { repository, issueNumber } = req.body;
         const taskIndex = tasks.findIndex(t => t.id === parseInt(req.params.id));
@@ -150,7 +150,7 @@ exports.linkTaskToGitHubIssue = async (req, res) => {
     }
 };
 
-exports.linkToGitHubIssue = async (req, res) => {
+export const linkToGitHubIssue = async (req, res) => {
     try {
         const { issueNumber } = req.body;
         const taskIndex = tasks.findIndex(t => t.id === parseInt(req.params.id));
