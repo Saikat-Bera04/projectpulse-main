@@ -10,5 +10,6 @@ router.post("/exchange", authController.exchangeCode);
 router.get("/verify", authenticateToken, authController.verifyToken);
 router.post("/logout", authController.logout);
 router.get("/user", authController.getUser);
+router.get("/debug", authController.authDebug);
 
 export default router;

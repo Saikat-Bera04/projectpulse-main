@@ -2,13 +2,26 @@ import { getGitHubAccessToken, getGitHubUser } from "../utils/github.js";
 import prisma from '../config/prisma.js';
 
 export const githubLogin = (req, res) => {
-    const redirectURL = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=user:email repo&redirect_uri=${process.env.GITHUB_CALLBACK_URL}`;
-    
+    // Validate required env vars before redirecting
+    const missing = [];
+    if (!process.env.GITHUB_CLIENT_ID) missing.push('GITHUB_CLIENT_ID');
+    if (!process.env.GITHUB_CALLBACK_URL) missing.push('GITHUB_CALLBACK_URL');
+    if (missing.length) {
+        console.error('Missing required env vars for GitHub OAuth:', missing);
+        return res.status(500).json({
+            error: 'Server is not configured for GitHub OAuth',
+            missing
+        });
+    }
+
+    const redirectURL = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=user:email repo&redirect_uri=${encodeURIComponent(process.env.GITHUB_CALLBACK_URL)}`;
+
     res.redirect(redirectURL);
 };
 
 export const githubCallback = async (req, res) => {
     const code = req.query.code;
+    const state = req.query.state;
 
     if (!code) {
         return res.status(400).json({ error: "Authorization code not provided" });
@@ -24,6 +37,10 @@ export const githubCallback = async (req, res) => {
 
         // Fetch GitHub user profile using utility function
         const githubUser = await getGitHubUser(accessToken);
+        
+        if (!githubUser || !githubUser.id) {
+            throw new Error("Failed to fetch GitHub user data");
+        }
 
         // Find or create user in database
         let user = await prisma.user.upsert({
@@ -31,13 +48,13 @@ export const githubCallback = async (req, res) => {
             update: {
                 githubAccessToken: accessToken,
                 name: githubUser.name || githubUser.login,
-                email: githubUser.email,
+                email: githubUser.email || undefined,
                 avatarUrl: githubUser.avatar_url,
                 githubUsername: githubUser.login,
-                bio: githubUser.bio,
-                location: githubUser.location,
-                company: githubUser.company,
-                website: githubUser.blog,
+                bio: githubUser.bio || null,
+                location: githubUser.location || null,
+                company: githubUser.company || null,
+                website: githubUser.blog || null,
                 lastLogin: new Date(),
             },
             create: {
@@ -47,42 +64,69 @@ export const githubCallback = async (req, res) => {
                 name: githubUser.name || githubUser.login,
                 githubAccessToken: accessToken,
                 avatarUrl: githubUser.avatar_url,
-                bio: githubUser.bio,
-                location: githubUser.location,
-                company: githubUser.company,
-                website: githubUser.blog,
+                bio: githubUser.bio || null,
+                location: githubUser.location || null,
+                company: githubUser.company || null,
+                website: githubUser.blog || null,
                 lastLogin: new Date(),
             },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                githubUsername: true,
+                avatarUrl: true,
+                role: true
+            }
         });
 
         // Set user session
         req.session.userId = user.id;
+        req.session.save(err => {
+            if (err) {
+                console.error('Session save error:', err);
+                return res.status(500).json({ error: 'Failed to save session' });
+            }
 
-        // Store token and user info in secure cookies
-        res.cookie("github_token", accessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 24 * 60 * 60 * 1000 // 24 hours
+            // Set user info in a non-httpOnly cookie for client-side access
+            res.cookie('user', JSON.stringify({
+                id: user.id,
+                login: user.githubUsername,
+                name: user.name,
+                email: user.email,
+                avatar_url: user.avatarUrl,
+                role: user.role
+            }), {
+                httpOnly: false,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                path: '/',
+                maxAge: 24 * 60 * 60 * 1000, // 24 hours
+                domain: process.env.NODE_ENV === 'production' ? '.yourdomain.com' : 'localhost'
+            });
+
+            // Set secure httpOnly token cookie
+            res.cookie('token', accessToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                path: '/',
+                maxAge: 24 * 60 * 60 * 1000, // 24 hours
+                domain: process.env.NODE_ENV === 'production' ? '.yourdomain.com' : 'localhost'
+            });
+
+            // Redirect to frontend with success state
+            const redirectUrl = state 
+                ? `${process.env.FRONTEND_URL || 'http://localhost:3000'}${decodeURIComponent(state)}`
+                : `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard`;
+                
+            res.redirect(redirectUrl);
         });
-
-        res.cookie("user", JSON.stringify({
-            id: user.id,
-            login: user.githubUsername,
-            name: user.name,
-            email: user.email,
-            avatar_url: user.avatarUrl
-        }), {
-            httpOnly: false,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 24 * 60 * 60 * 1000 // 24 hours
-        });
-
-        // Redirect to frontend dashboard
-        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard?auth=success`);
     } catch (err) {
         console.error("GitHub OAuth Error:", err.message);
+        if (err.response) {
+            console.error('GitHub OAuth error response:', err.response.data);
+        }
         res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=oauth_failed`);
     }
 };
@@ -199,4 +243,26 @@ export const verifyToken = async (req, res) => {
     } catch (error) {
         res.status(401).json({ error: "Invalid token" });
     }
+};
+
+export const authDebug = (req, res) => {
+    // Expose only non-sensitive diagnostics
+    const allowedOrigins = [
+        process.env.FRONTEND_URL || 'http://localhost:3000',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000'
+    ];
+    res.json({
+        node_env: process.env.NODE_ENV,
+        has_github_client_id: Boolean(process.env.GITHUB_CLIENT_ID),
+        has_github_client_secret: Boolean(process.env.GITHUB_CLIENT_SECRET),
+        github_callback_url: process.env.GITHUB_CALLBACK_URL,
+        frontend_url: process.env.FRONTEND_URL || 'http://localhost:3000',
+        session_cookie: {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+        },
+        cors_allowed_origins: allowedOrigins
+    });
 };

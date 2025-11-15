@@ -2,16 +2,21 @@ import axios from "axios";
 
 export const getGitHubAccessToken = async (code) => {
     try {
+        const params = new URLSearchParams();
+        params.append('client_id', process.env.GITHUB_CLIENT_ID || '');
+        params.append('client_secret', process.env.GITHUB_CLIENT_SECRET || '');
+        params.append('code', code);
+        if (process.env.GITHUB_CALLBACK_URL) {
+            params.append('redirect_uri', process.env.GITHUB_CALLBACK_URL);
+        }
+
         const response = await axios.post(
             "https://github.com/login/oauth/access_token",
-            {
-                client_id: process.env.GITHUB_CLIENT_ID,
-                client_secret: process.env.GITHUB_CLIENT_SECRET,
-                code,
-            },
+            params.toString(),
             {
                 headers: {
-                    Accept: "application/json"
+                    Accept: "application/json",
+                    'Content-Type': 'application/x-www-form-urlencoded'
                 }
             }
         );
@@ -19,6 +24,9 @@ export const getGitHubAccessToken = async (code) => {
         return response.data.access_token;
     } catch (error) {
         console.error("Error fetching access token:", error.message);
+        if (error.response) {
+            console.error("GitHub token error response:", error.response.data);
+        }
         throw new Error("Failed to get access token from GitHub");
     }
 };
@@ -35,6 +43,9 @@ export const getGitHubUser = async (accessToken) => {
         return response.data;
     } catch (error) {
         console.error("Error fetching GitHub user:", error.message);
+        if (error.response) {
+            console.error("GitHub user error response:", error.response.data);
+        }
         throw new Error("Failed to fetch GitHub user");
     }
 };

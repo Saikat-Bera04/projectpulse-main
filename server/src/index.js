@@ -28,15 +28,15 @@ initPinecone().catch(err => {
 });
 
 // Configure CORS with proper credentials support
+const allowedOrigins = [
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
+];
+
 const corsOptions = {
     origin: function (origin, callback) {
-        const allowedOrigins = [
-            process.env.FRONTEND_URL || 'http://localhost:3000',
-            'http://localhost:3000',
-            'http://127.0.0.1:3000'
-        ];
-        
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
             console.warn('Blocked by CORS:', origin);
@@ -45,8 +45,10 @@ const corsOptions = {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['set-cookie']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['set-cookie'],
+    maxAge: 600, // 10 minutes
+    optionsSuccessStatus: 204
 };
 
 app.use(cors(corsOptions));
@@ -59,12 +61,17 @@ const sessionConfig = {
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
+    name: 'projectpulse.sid',
+    proxy: process.env.NODE_ENV === 'production',
     cookie: {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    }
+        path: '/',
+        domain: process.env.NODE_ENV === 'production' ? '.yourdomain.com' : 'localhost'
+    },
+    rolling: true
 };
 
 // Use Redis for session store in production
