@@ -2,14 +2,10 @@
   "name": "projectpulse",
   "displayName": "ProjectPulse",
   "description": "Task management and GitHub integration for collaborative coding",
-  "version": "1.0.3",
-  "publisher": "saikatbera",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/saikatbera/projectpulse-extension.git"
-  },
+  "version": "0.0.1",
+  "publisher": "projectpulse",
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.106.0"
   },
   "categories": [
     "Other"
@@ -79,7 +75,7 @@
         },
         {
           "id": "projectpulseAuth",
-          "name": "Authentication",
+          "name": "Authentication", 
           "when": "!projectpulse.authenticated",
           "icon": "$(account)"
         }
@@ -128,15 +124,15 @@
     "test": "vscode-test"
   },
   "devDependencies": {
+    "@types/vscode": "^1.106.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "@types/vscode": "^1.74.0",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
-    "esbuild": "^0.27.0",
+    "typescript-eslint": "^8.46.3",
     "eslint": "^9.39.1",
+    "esbuild": "^0.27.0",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.3"
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
   }
 }
